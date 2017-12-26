@@ -26,7 +26,7 @@ class AccountBankStatementImport(models.TransientModel):
     @api.model
     def _valid_paypal_line(self, line):
         """This method is designed to be inherited"""
-        return line[3].startswith('Pago') or line[3].startswith('Reembolso')
+        return line[4].startswith('Pago') or line[4].startswith('Reembolso')
 
     @api.model
     def _paypal_convert_amount(self, amount_str):
@@ -69,14 +69,14 @@ class AccountBankStatementImport(models.TransientModel):
             )
             rline = {
                 'date': fields.Date.to_string(date_dt),
-                'currency': line[4],
+                'currency': line[6],
                 'partner_email': line[10],
-                'owner_name': line[11],
-                'amount': line[5],
-                'commission': line[6],
-                'balance': line[8],
-                'transac_ref': line[9],
-                'ref': line[9],
+                'owner_name': line[3],
+                'amount': line[7],
+                'commission': line[8],
+                'balance': line[29],
+                'transac_ref': line[25],
+                'ref': line[12],
                 'line_nr': i,
             }
             name_list = [line[3]]
