@@ -120,12 +120,14 @@ class AccountBankStatementImport(models.TransientModel):
                     assert (
                         wline['amount'] ==
                         other_currency_line['amount_currency'] * -1),\
-                        'WRONG amount'
+                        'WRONG amount %s vs %s' % (wline.get('amount'),
+                                                   other_currency_line.get(
+                                                       'amount_currency'))
                     other_currency_line['transac_ref'] = wline['transac_ref']
             else:
                 if (other_currency_line and
                         wline['transac_ref'] ==
-                        other_currency_line['transac_ref']):
+                        other_currency_line.get('transac_ref', '')):
                     wline.update(other_currency_line)
                     # reset other_currency_line
                     other_currency_line = {}
