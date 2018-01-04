@@ -26,6 +26,8 @@ class AccountBankStatementImport(models.TransientModel):
     @api.model
     def _valid_paypal_line(self, line):
         """This method is designed to be inherited"""
+        # Esta comprobación sólo tiene en cuenta dos tipos de líneas, pero
+        # hay unos cuantos más.
         return line[4].startswith('Pago') or line[4].startswith('Reembolso')
 
     @api.model
@@ -38,12 +40,17 @@ class AccountBankStatementImport(models.TransientModel):
 
     @api.model
     def _check_paypal(self, data_file):
-        """This method is designed to be inherited"""
+        """
+        Comprobación de que se trata del tipo de fichero
+        de paypal esperado.
+        """
         return data_file.startswith('"Fecha",')
 
     @api.model
     def _parse_file(self, data_file):
-        """ Import a file in Paypal CSV format"""
+        """
+        Import a file in Paypal CSV format
+        """
         paypal = self._check_paypal(data_file)
         if not paypal:
             return super(AccountBankStatementImport, self)._parse_file(
@@ -53,7 +60,7 @@ class AccountBankStatementImport(models.TransientModel):
         f.write(data_file)
         f.seek(0)
         transactions = []
-        i = 0
+        contador_lineas = 0
         start_balance = end_balance = start_date_str = end_date_str = False
         company_currency_name = self.env.user.company_id.currency_id.name
         commission_total = 0.0
@@ -61,8 +68,9 @@ class AccountBankStatementImport(models.TransientModel):
         import unicodecsv
         for line in unicodecsv.reader(
                 f, encoding=self._prepare_paypal_encoding()):
-            i += 1
-            if i == 1 or not line or not self._valid_paypal_line(line):
+            contador_lineas += 1
+            if contador_lineas == 1 or not line or not self._valid_paypal_line(
+                                                                        line):
                 continue
             date_dt = datetime.strptime(
                 line[0], self._prepare_paypal_date_format()
@@ -77,7 +85,7 @@ class AccountBankStatementImport(models.TransientModel):
                 'balance': line[29],
                 'transac_ref': line[25],
                 'ref': line[12],
-                'line_nr': i,
+                'line_nr': contador_lineas,
             }
             name_list = [line[3]]
             if line[16]:
@@ -92,7 +100,7 @@ class AccountBankStatementImport(models.TransientModel):
                     raise UserError(
                         _("Value '%s' for the field '%s' on line %d, "
                             "cannot be converted to float")
-                        % (rline[field], field, i))
+                        % (rline[field], field, contador_lineas))
             raw_lines.append(rline)
         # Second pass to sort out the lines in other currencies
         final_lines = []
@@ -120,9 +128,13 @@ class AccountBankStatementImport(models.TransientModel):
                     assert (
                         wline['amount'] ==
                         other_currency_line['amount_currency'] * -1),\
-                        'WRONG amount %s vs %s' % (wline.get('amount'),
-                                                   other_currency_line.get(
-                                                       'amount_currency'))
+                        'WRONG amount in line %s vs %s' % (
+                            str(wline.get('amount')) + '(line ' +
+                            str(wline.get('line_nr')) + ')',
+                            str(other_currency_line.get(
+                                    'amount_currency')) + '(line ' +
+                            str(other_currency_line.get('line_nr')) + ')',
+                        )
                     other_currency_line['transac_ref'] = wline['transac_ref']
             else:
                 if (other_currency_line and
