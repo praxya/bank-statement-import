@@ -8,6 +8,8 @@ from openerp import _, api, fields, models
 from openerp.exceptions import Warning as UserError
 import re
 from cStringIO import StringIO
+import logging
+_logger = logging.getLogger(__name__)
 
 
 class AccountBankStatementImport(models.TransientModel):
@@ -71,6 +73,8 @@ class AccountBankStatementImport(models.TransientModel):
             contador_lineas += 1
             if contador_lineas == 1 or not line or not self._valid_paypal_line(
                                                                         line):
+                _logger.debug(u"Ignorando línea %s: %s" % (
+                    str(contador_lineas), str(line)))
                 continue
             date_dt = datetime.strptime(
                 line[0], self._prepare_paypal_date_format()
@@ -128,7 +132,7 @@ class AccountBankStatementImport(models.TransientModel):
                     assert (
                         wline['amount'] ==
                         other_currency_line['amount_currency'] * -1),\
-                        'WRONG amount in line %s vs %s' % (
+                        'WRONG amount %s vs %s' % (
                             str(wline.get('amount')) + '(line ' +
                             str(wline.get('line_nr')) + ')',
                             str(other_currency_line.get(
