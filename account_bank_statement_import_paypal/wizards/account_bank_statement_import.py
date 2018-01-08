@@ -108,10 +108,11 @@ class AccountBankStatementImport(models.TransientModel):
             raw_lines.append(rline)
         # Second pass to sort out the lines in other currencies
         final_lines = []
-        other_currency_line = {}
         for wline in raw_lines:
+            other_currency_line = {}
             if company_currency_name != wline['currency']:
                 if not wline['transac_ref'] and not other_currency_line:
+                # if not wline['transac_ref']:
                     currencies = self.env['res.currency'].search(
                         [('name', '=', wline['currency'])])
                     if not currencies:
