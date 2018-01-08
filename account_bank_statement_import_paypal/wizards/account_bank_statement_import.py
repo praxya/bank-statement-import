@@ -81,6 +81,7 @@ class AccountBankStatementImport(models.TransientModel):
             )
             rline = {
                 'date': fields.Date.to_string(date_dt),
+                'time': str(line[1]),
                 'currency': line[6],
                 'partner_email': line[10],
                 'owner_name': line[3],
@@ -111,28 +112,29 @@ class AccountBankStatementImport(models.TransientModel):
         for wline in raw_lines:
             other_currency_line = {}
             if company_currency_name != wline['currency']:
-                if not wline['transac_ref'] and not other_currency_line:
+                # if not wline['transac_ref'] and not other_currency_line:
                 # if not wline['transac_ref']:
-                    currencies = self.env['res.currency'].search(
-                        [('name', '=', wline['currency'])])
-                    if not currencies:
-                        raise UserError(
-                            _('Currency %s on line %d cannot be found in Odoo')
-                            % (wline['currency'], wline['line_nr']))
-                    other_currency_line = {
-                        'amount_currency': wline['amount'],
-                        'currency_id': currencies[0].id,
-                        'currency': wline['currency'],
-                        'name': wline['name'],
-                        'owner_name': wline['owner_name'],
-                        }
-                if wline['transac_ref'] and other_currency_line:
+                currencies = self.env['res.currency'].search(
+                    [('name', '=', wline['currency'])])
+                if not currencies:
+                    raise UserError(
+                        _('Currency %s on line %d cannot be found in Odoo')
+                        % (wline['currency'], wline['line_nr']))
+                other_currency_line = {
+                    'amount_currency': wline['amount'],
+                    'currency_id': currencies[0].id,
+                    'currency': wline['currency'],
+                    'name': wline['name'],
+                    'owner_name': wline['owner_name'],
+                    'line_nr': wline['line_nr']
+                    }
+                if wline['transac_ref'] or other_currency_line:
                     assert (
                         wline['currency'] == other_currency_line['currency']),\
                         'WRONG currency'
                     assert (
                         wline['amount'] ==
-                        other_currency_line['amount_currency'] * -1),\
+                        other_currency_line['amount_currency']),\
                         'WRONG amount %s vs %s' % (
                             str(wline.get('amount')) + '(line ' +
                             str(wline.get('line_nr')) + ')',
@@ -141,6 +143,12 @@ class AccountBankStatementImport(models.TransientModel):
                             str(other_currency_line.get('line_nr')) + ')',
                         )
                     other_currency_line['transac_ref'] = wline['transac_ref']
+                    #  Obtengo el importe en €
+                    wline['amount'] = self.convert_amount(
+                                                        wline['date'],
+                                                        wline['time'],
+                                                        data_file)
+                    final_lines.append(wline)
             else:
                 if (other_currency_line and
                         wline['transac_ref'] ==
@@ -193,3 +201,21 @@ class AccountBankStatementImport(models.TransientModel):
             'transactions': transactions,
         }
         return None, None, [vals_bank_statement]
+
+    def convert_amount(self, date, time, data_file):
+        f = StringIO()
+        f.write(data_file)
+        f.seek(0)
+        import unicodecsv
+        for line in unicodecsv.reader(
+                f, encoding=self._prepare_paypal_encoding()):
+            _date = ''
+            if line[0].encode('ascii', 'ignore') != 'Fecha':
+                _date = fields.Date.to_string(datetime.strptime(
+                    line[0], self._prepare_paypal_date_format()
+                ))
+            _time = line[1].encode('ascii', 'ignore')
+            _currency = line[6].encode('ascii', 'ignore')
+            if _date == date and _time == time and _currency == 'EUR':
+                # import ipdb; ipdb.set_trace()
+                return self._paypal_convert_amount(line[7])
